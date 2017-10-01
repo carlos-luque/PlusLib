@@ -195,6 +195,12 @@ protected:
   /*! Stops client's data receiving thread, closes the socket, and removes the client from the client list */
   void DisconnectClient(int clientId);
 
+  /*! Send data to the client with intelligent error handling */
+  bool SendWithRetry(igtl::ClientSocket::Pointer client, void* data, int size);
+
+  /*! Operating system specific logic for network error logging */
+  void LogSendError(igtl::MessageBase::Pointer message);
+
   /*! Set IGTL CRC check flag (0: disabled, 1: enabled) */
   vtkSetMacro(IgtlMessageCrcCheckEnabled, bool);
   /*! Get IGTL CRC check flag (0: disabled, 1: enabled) */

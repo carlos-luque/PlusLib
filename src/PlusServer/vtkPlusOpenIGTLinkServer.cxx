@@ -42,8 +42,10 @@ See License.txt for details.
 #if defined(WIN32)
   #include "vtkPlusOpenIGTLinkServerWin32.cxx"
 #elif defined(__APPLE__)
+  #include "errno.h"
   #include "vtkPlusOpenIGTLinkServerMacOSX.cxx"
 #elif defined(__linux__)
+  #include "errno.h"
   #include "vtkPlusOpenIGTLinkServerLinux.cxx"
 #endif
 
@@ -522,7 +524,11 @@ PlusStatus vtkPlusOpenIGTLinkServer::SendCommandResponses(vtkPlusOpenIGTLinkServ
         LOG_WARNING("Message reply cannot be sent to client " << (*responseIt)->GetClientId() << ", probably client has been disconnected");
         continue;
       }
-      clientSocket->Send(igtlResponseMessage->GetBufferPointer(), igtlResponseMessage->GetBufferSize());
+
+      if (!self.SendWithRetry(clientSocket, igtlResponseMessage->GetBufferPointer(), igtlResponseMessage->GetBufferSize()))
+      {
+        self.LogSendError(igtlResponseMessage);
+      }
     }
   }
 
@@ -596,7 +602,11 @@ void* vtkPlusOpenIGTLinkServer::DataReceiverThread(vtkMultiThreader::ThreadInfo*
       igtl::StatusMessage::Pointer replyMsg = dynamic_cast<igtl::StatusMessage*>(bodyMessage.GetPointer());
       replyMsg->SetCode(igtl::StatusMessage::STATUS_OK);
       replyMsg->Pack();
-      clientSocket->Send(replyMsg->GetPackPointer(), replyMsg->GetPackBodySize());
+
+      if (!self->SendWithRetry(clientSocket, replyMsg->GetBufferPointer(), replyMsg->GetBufferSize()))
+      {
+        self->LogSendError((igtl::MessageBase*)(replyMsg.GetPointer()));
+      }
     }
     else if (typeid(*bodyMessage) == typeid(igtl::StringMessage)
              && vtkPlusCommand::IsCommandDeviceName(headerMsg->GetDeviceName()))
@@ -807,15 +817,10 @@ PlusStatus vtkPlusOpenIGTLinkServer::SendTrackedFrame(PlusTrackedFrame& trackedF
           continue;
         }
 
-        int retValue = 0;
-        RETRY_UNTIL_TRUE((retValue = clientSocket->Send(igtlMessage->GetBufferPointer(), igtlMessage->GetBufferSize())) != 0, this->NumberOfRetryAttempts, this->DelayBetweenRetryAttemptsSec);
-        if (retValue == 0)
+        if (!SendWithRetry(clientSocket, igtlMessage->GetBufferPointer(), igtlMessage->GetBufferSize()))
         {
           disconnectedClientIds.push_back(clientIterator->ClientId);
-          igtl::TimeStamp::Pointer ts = igtl::TimeStamp::New();
-          igtlMessage->GetTimeStamp(ts);
-          LOG_INFO("Client disconnected - could not send " << igtlMessage->GetMessageType() << " message to client (device name: " << igtlMessage->GetDeviceName()
-                   << "  Timestamp: " << std::fixed << ts->GetTimeStamp() << ").");
+          LogSendError(igtlMessage);
           break;
         }
 
@@ -919,11 +924,62 @@ void vtkPlusOpenIGTLinkServer::DisconnectClient(int clientId)
 }
 
 //----------------------------------------------------------------------------
+bool vtkPlusOpenIGTLinkServer::SendWithRetry(igtl::ClientSocket::Pointer clientSocket, void* data, int size)
+{
+  bool success = false;
+  int numOfTries = 0;
+  while (!success && numOfTries < this->NumberOfRetryAttempts)
+  {
+    success = clientSocket->Send(data, size);
+    if (success)
+    {
+      /* command successfully completed, continue without waiting */
+      break;
+    }
+
+    /* command failed, wait for some time and retry */
+    numOfTries++;
+    vtkPlusAccurateTimer::Delay(this->DelayBetweenRetryAttemptsSec);
+  }
+
+  return success;
+}
+
+//----------------------------------------------------------------------------
+void vtkPlusOpenIGTLinkServer::LogSendError(igtl::MessageBase::Pointer message)
+{
+  igtl::TimeStamp::Pointer ts = igtl::TimeStamp::New();
+  message->GetTimeStamp(ts);
+
+#if _WIN32
+  LPSTR errorStr;
+  if (FormatMessage(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM,
+                    NULL,
+                    WSAGetLastError(),
+                    0,
+                    (LPTSTR)&errorStr,
+                    0,
+                    NULL) == 0)
+  {
+    // Failed in translating the error.
+  }
+
+  LOG_INFO("Client disconnected - could not send " << message->GetMessageType() << " message to client (device name: " << message->GetDeviceName()
+           << "  Timestamp: " << std::fixed << ts->GetTimeStamp() << "). WSAGetLastError(): " << errorStr);
+
+  HeapFree(GetProcessHeap(), 0, errorStr);
+#else
+  LOG_INFO("Client disconnected - could not send " << message->GetMessageType() << " message to client (device name: " << message->GetDeviceName()
+           << "  Timestamp: " << std::fixed << ts->GetTimeStamp() << "). strerror(errno): " << strerror(errno));
+#endif
+}
+
+//----------------------------------------------------------------------------
 void vtkPlusOpenIGTLinkServer::KeepAlive()
 {
   LOG_TRACE("Keep alive packet sent to clients...");
 
-  std::vector< int > disconnectedClientIds;
+  std::vector<int> disconnectedClientIds;
 
   {
     // Lock before we send message to the clients
@@ -935,24 +991,19 @@ void vtkPlusOpenIGTLinkServer::KeepAlive()
       replyMsg->SetCode(igtl::StatusMessage::STATUS_OK);
       replyMsg->Pack();
 
-      int retValue = 0;
-      RETRY_UNTIL_TRUE(
-        (retValue = clientIterator->ClientSocket->Send(replyMsg->GetPackPointer(), replyMsg->GetPackSize())) != 0,
-        this->NumberOfRetryAttempts, this->DelayBetweenRetryAttemptsSec);
-      if (retValue == 0)
+      if (!SendWithRetry(clientIterator->ClientSocket, replyMsg->GetBufferPointer(), replyMsg->GetBufferSize()))
       {
         disconnectedClientIds.push_back(clientIterator->ClientId);
         igtl::TimeStamp::Pointer ts = igtl::TimeStamp::New();
         replyMsg->GetTimeStamp(ts);
 
-        LOG_DEBUG("Client disconnected - could not send " << replyMsg->GetMessageType() << " message to client (device name: " << replyMsg->GetDeviceName()
-                  << "  Timestamp: " << std::fixed <<  ts->GetTimeStamp() << ").");
+        LogSendError((igtl::MessageBase*)replyMsg.GetPointer());
       }
-    } // clientIterator
-  } // unlock client list
+    }
+  }
 
   // Clean up disconnected clients
-  for (std::vector< int >::iterator it = disconnectedClientIds.begin(); it != disconnectedClientIds.end(); ++it)
+  for (std::vector<int>::iterator it = disconnectedClientIds.begin(); it != disconnectedClientIds.end(); ++it)
   {
     DisconnectClient(*it);
   }
