@@ -327,6 +327,8 @@ private:
   static int ClientIdCounter;
 
   static const float CLIENT_SOCKET_TIMEOUT_SEC;
+
+  static std::vector<int> SEND_ABORTABLE_ERRORS;
 };
 
 #endif

@@ -56,6 +56,38 @@ static const int IGTL_EMPTY_DATA_SIZE = -1;
 
 const float vtkPlusOpenIGTLinkServer::CLIENT_SOCKET_TIMEOUT_SEC = 0.5;
 
+#if defined(_WIN32)
+std::vector<int> vtkPlusOpenIGTLinkServer::SEND_ABORTABLE_ERRORS =
+{
+  WSAENETDOWN,
+  WSAENETUNREACH,
+  WSAENETRESET,
+  WSAECONNABORTED,
+  WSAECONNRESET,
+  WSAECONNREFUSED,
+  WSAEHOSTDOWN,
+  WSAEHOSTUNREACH,
+  WSASYSNOTREADY
+};
+#elif defined(__linux__) || defined(__APPLE)
+std::vector<int> vtkPlusOpenIGTLinkServer::SEND_ABORTABLE_ERRORS =
+{
+  EACCES,
+  EPIPE,
+  ENETDOWN,
+  ENETUNREACH,
+  ENETRESET,
+  ECONNABORTED,
+  ECONNRESET,
+  ENOTCONN,
+  ESHUTDOWN,
+  ECONNREFUSED,
+  EHOSTDOWN,
+  EHOSTUNREACH,
+  ENOLINK
+}
+#endif
+
 //----------------------------------------------------------------------------
 // If a frame cannot be retrieved from the device buffers (because it was overwritten by new frames)
 // then we skip a SAMPLING_SKIPPING_MARGIN_SEC long period to allow the application to catch up.
@@ -986,23 +1018,32 @@ void vtkPlusOpenIGTLinkServer::DisconnectClient(int clientId)
 //----------------------------------------------------------------------------
 bool vtkPlusOpenIGTLinkServer::SendWithRetry(igtl::ClientSocket::Pointer clientSocket, void* data, int size)
 {
-  bool success = false;
-  int numOfTries = 0;
-  while (!success && numOfTries < this->NumberOfRetryAttempts)
+  for (int numOfTries = 0; numOfTries < this->NumberOfRetryAttempts; numOfTries++)
   {
-    success = clientSocket->Send(data, size);
-    if (success)
+    if (clientSocket->Send(data, size))
     {
       /* command successfully completed, continue without waiting */
-      break;
+      return true;
+    }
+    else
+    {
+#if defined(_WIN32)
+      int error = WSAGetLastError();
+#elif defined(__APPLE__) || (__linux__)
+      int error = errno;
+#endif
+      if (std::find(begin(SEND_ABORTABLE_ERRORS), end(SEND_ABORTABLE_ERRORS), error) != end(SEND_ABORTABLE_ERRORS))
+      {
+        // Return failure here, as a critical failure has occurred and we will never be able to send
+        return false;
+      }
     }
 
     /* command failed, wait for some time and retry */
-    numOfTries++;
     vtkPlusAccurateTimer::Delay(this->DelayBetweenRetryAttemptsSec);
   }
 
-  return success;
+  return false;
 }
 
 //----------------------------------------------------------------------------
