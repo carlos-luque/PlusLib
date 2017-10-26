@@ -172,6 +172,9 @@ See License.txt for details.
   #include "vtkPlusOpenCVCaptureVideoSource.h"
 #endif
 
+#ifdef PLUS_USE_INFRARED_SEEK_CAM
+  #include "vtkInfraredSeekCam.h"
+#endif
 //----------------------------------------------------------------------------
 
 vtkStandardNewMacro(vtkPlusDeviceFactory);
@@ -310,6 +313,9 @@ vtkPlusDeviceFactory::vtkPlusDeviceFactory()
 #endif
 #ifdef PLUS_USE_OpenCV_VIDEO
   RegisterDevice("OpenCVVideo", "vtkPlusOpenCVCaptureVideoSource", (PointerToDevice)&vtkPlusOpenCVCaptureVideoSource::New);
+#endif
+#ifdef PLUS_USE_INFRARED_SEEK_CAM
+  RegisterDevice("InfraredSeekCam", "vtkInfraredSeekCam", (PointerToDevice)&vtkInfraredSeekCam::New);
 #endif
 
   // Virtual Devices
