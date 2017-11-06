@@ -13,6 +13,9 @@ See License.txt for details.
 // OpenCV includes
 #include <opencv2/videoio.hpp>
 
+// Seek Pro
+#include <seek.h>
+
 /*!
 \class vtkInfraredSeekCam
 \brief Class for interfacing an OpenCVC capture device and recording frames into a Plus buffer
@@ -71,6 +74,8 @@ protected:
   std::shared_ptr<cv::VideoCapture> Capture;
   std::shared_ptr<cv::Mat>          Frame;
   cv::VideoCaptureAPIs              RequestedCaptureAPI;
+
+  LibSeek::SeekThermalPro           SeekPro;
 };
 
 #endif // __vtkInfraredSeekCam_h
