@@ -45,7 +45,7 @@ PlusStatus vtkInfraredSeekCam::ReadConfiguration(vtkXMLDataElement* rootConfigEl
 {
   //TODO
   LOG_TRACE("vtkInfraredSeekCam::ReadConfiguration");
-  // XML_FIND_DEVICE_ELEMENT_REQUIRED_FOR_READING(deviceConfig, rootConfigElement);
+  XML_FIND_DEVICE_ELEMENT_REQUIRED_FOR_READING(deviceConfig, rootConfigElement);
   // XML_READ_STRING_ATTRIBUTE_REQUIRED(VideoURL, deviceConfig);
   // std::string captureApi;
   // XML_READ_STRING_ATTRIBUTE_NONMEMBER_OPTIONAL("CaptureAPI", captureApi, deviceConfig);
