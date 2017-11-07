@@ -26,12 +26,6 @@ Requires OpenCV with FFMPEG built (for RTSP support)
 \ingroup PlusLibDataCollection
 */
 
-namespace cv
-{
-  class VideoCapture;
-  class Mat;
-}
-
 class vtkPlusDataCollectionExport vtkInfraredSeekCam : public vtkPlusDevice
 {
 public:
@@ -56,26 +50,20 @@ public:
   /*! Verify the device is correctly configured */
   virtual PlusStatus NotifyConfigured();
 
-  vtkGetStdStringMacro(VideoURL);
-  vtkSetStdStringMacro(VideoURL);
+  // vtkGetStdStringMacro(VideoURL);
+  // vtkSetStdStringMacro(VideoURL);
 
 protected:
   vtkInfraredSeekCam();
   ~vtkInfraredSeekCam();
 
-  virtual PlusStatus InternalConnect();
-  virtual PlusStatus InternalDisconnect();
-
-  cv::VideoCaptureAPIs CaptureAPIFromString(const std::string& apiString);
-  std::string StringFromCaptureAPI(cv::VideoCaptureAPIs api);
+  virtual PlusStatus InternalConnect() VTK_OVERRIDE;
+  virtual PlusStatus InternalDisconnect() VTK_OVERRIDE;
 
 protected:
-  std::string                       VideoURL;
-  std::shared_ptr<cv::VideoCapture> Capture;
-  std::shared_ptr<cv::Mat>          Frame;
-  cv::VideoCaptureAPIs              RequestedCaptureAPI;
-
-  LibSeek::SeekThermalPro           SeekPro;
+  std::shared_ptr<LibSeek::SeekThermalPro>  Capture;
+  std::shared_ptr<cv::Mat>                  Frame;
+ 
 };
 
 #endif // __vtkInfraredSeekCam_h
