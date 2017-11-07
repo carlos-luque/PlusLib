@@ -10,18 +10,12 @@ See License.txt for details.
 #include "vtkPlusDataCollectionExport.h"
 #include "vtkPlusDevice.h"
 
-// OpenCV includes
-#include <opencv2/videoio.hpp>
-
 // Seek Pro
 #include <seek.h>
 
 /*!
 \class vtkInfraredSeekCam
-\brief Class for interfacing an OpenCVC capture device and recording frames into a Plus buffer
-
-Requires the PLUS_USE_OpenCVCapture_VIDEO option in CMake.
-Requires OpenCV with FFMPEG built (for RTSP support)
+\brief Class for interfacing an Infrared Seek capture device and recording frames into a Plus buffer
 
 \ingroup PlusLibDataCollection
 */
@@ -63,7 +57,6 @@ protected:
 protected:
   std::shared_ptr<LibSeek::SeekThermalPro>  Capture;
   std::shared_ptr<cv::Mat>                  Frame;
- 
 };
 
 #endif // __vtkInfraredSeekCam_h

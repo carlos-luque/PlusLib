@@ -15,7 +15,7 @@ See License.txt for details.
 #include <vtkObjectFactory.h>
 
 // OpenCV includes
-//#include <opencv2/imgproc/imgproc.hpp>
+#include <opencv2/highgui/highgui.hpp>
 
 //----------------------------------------------------------------------------
 
