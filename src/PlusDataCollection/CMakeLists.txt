@@ -1800,16 +1800,28 @@ IF(PLUS_USE_INFRARED_SEEK_CAM)
   LIST(APPEND ${PROJECT_NAME}_INCLUDE_DIRS
     ${SEEKPRO_INCLUDE_DIR}
     ${CMAKE_CURRENT_SOURCE_DIR}/InfraredSeekCam
+    ${OpenCV_INCLUDE_DIRS}
   )
 
   # Create a target for proper CMake infrastructure
   ADD_LIBRARY(SeekPro SHARED IMPORTED)
-  SET_PROPERTY(TARGET SeekPro PROPERTY IMPORTED_IMPLIB ${SEEKPRO_LIB_DIR}/libinfraredseek_static.a)
-  SET_PROPERTY(TARGET SeekPro PROPERTY IMPORTED_LOCATION ${SEEKPRO_LIB_DIR}/libinfraredseek.so)
+ # SET_PROPERTY(TARGET SeekPro PROPERTY IMPORTED_IMPLIB ${SEEKPRO_LIB_DIR}/libinfraredseek_static.a)
+  #SET_PROPERTY(TARGET SeekPro PROPERTY IMPORTED_LOCATION ${SEEKPRO_LIB_DIR}/libinfraredseek.so)
   
+  SET(SEEKPRO_LIB_FILE ${SEEKPRO_LIB_DIR}/libinfraredseek_static${CMAKE_STATIC_LIBRARY_SUFFIX} CACHE FILEPATH ".a file for SeekPro.")
+  SET(SEEKPRO_SHARED_LIB_FILE ${SEEKPRO_BINARY_DIR}/libinfraredseek${CMAKE_SHARED_LIBRARY_SUFFIX} CACHE FILEPATH ".so file for SeekPro.")
+
+
   LIST(APPEND ${PROJECT_NAME}_LIBS 
     SeekPro
   )
+
+  LIST(APPEND External_Libraries_Install ${SEEKPRO_SHARED_LIB_FILE})
+  SET(External_Libraries_Static_Install ${External_Libraries_Static_Install} ${SEEKPRO_LIB_FILE})
+
+  SET_PROPERTY(TARGET SeekPro PROPERTY IMPORTED_IMPLIB ${SEEKPRO_LIB_FILE})
+  SET_PROPERTY(TARGET SeekPro PROPERTY IMPORTED_LOCATION ${SEEKPRO_SHARED_LIB_FILE}) 
+
 ENDIF()
 
 # --------------------------------------------------------------------------
